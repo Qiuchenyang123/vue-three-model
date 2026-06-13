@@ -6,15 +6,23 @@ import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js'
 const BOARD_MODEL_PATH = '/models/board_background.glb'
 const CLIP_MODEL_PATH = '/models/CLIP.glb'
 const LAMP_MODEL_PATH = '/models/lamp.glb'
-const CAMERA_BASE_POSITION = new THREE.Vector3(7.12, 5.16, -0.06)
+const BOARD_PROJECT1_PATH = '/models/board_project1.glb'
+const CAMERA_BASE_POSITION = new THREE.Vector3(7.12, 7.16, -0.06)
 const CAMERA_TARGET = new THREE.Vector3(0, 0.7, 0)
 const CAMERA_FORWARD_OFFSET = 1.25
 
 const modelPlacements = [
   {
     path: '/models/board_background.glb',
-    targetSize: new THREE.Vector3(10.05, 9.6, 8),
-    position: new THREE.Vector3(-2.65, 2, 0.75),
+    targetSize: new THREE.Vector3(3.88, 4.82, 5.6),
+    position: new THREE.Vector3(-2.65, 2.43, 0.75),
+    rotation: new THREE.Euler(0, 0, 0),
+    anchor: 'center',
+  },
+  {
+    path: '/models/board_project1.glb',
+    targetSize: new THREE.Vector3(1.05, 1.6, 1),
+    position: new THREE.Vector3(-2.69, 3.45, 3.19),
     rotation: new THREE.Euler(0, 0, 0),
     anchor: 'center',
   },
@@ -35,7 +43,7 @@ const modelPlacements = [
   {
     path: '/models/CLIP.glb',
     targetSize: new THREE.Vector3(2.27, 0.6, 1.26),
-    position: new THREE.Vector3(0.24, 1.08, 2.46),
+    position: new THREE.Vector3(0.24, 1, 2.46),
     rotation: new THREE.Euler(0, 2.46, 0),
     anchor: 'bottom',
   },
@@ -123,10 +131,10 @@ export function useThreeDeskScene(options = {}) {
     controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.enablePan = false
-    controls.minDistance = 6.8
+    controls.minDistance = 0.8
     controls.maxDistance = 13
-    controls.minPolarAngle = 0.9
-    controls.maxPolarAngle = 1.38
+    controls.minPolarAngle = 0.1
+    controls.maxPolarAngle = 3.38
     controls.target.copy(CAMERA_TARGET)
 
     addLights(scene)
@@ -359,30 +367,27 @@ export function useThreeDeskScene(options = {}) {
     gui = new GUI({ title: 'Scene Controls' })
     gui.domElement.style.zIndex = '30'
 
-    const boardFolder = gui.addFolder('Board')
-    createModelControls(boardFolder, BOARD_MODEL_PATH, {
-      size: { min: 0.5, max: 12 },
-      position: { x: [-8, 8], y: [-2, 8], z: [-10, 2] },
+    const project1Folder = gui.addFolder('Board Project 1')
+    createModelControls(project1Folder, BOARD_PROJECT1_PATH, {
+      size: { min: 0.1, max: 12 },
+      position: { x: [-8, 8], y: [-4, 8], z: [-10, 10] },
       rotation: { x: [-Math.PI, Math.PI], y: [-Math.PI, Math.PI], z: [-Math.PI, Math.PI] },
     })
-    boardFolder.add({ print: () => logModelConfig(BOARD_MODEL_PATH) }, 'print').name('Copy board config')
-    boardFolder.open()
+    project1Folder.add({ print: () => logModelConfig(BOARD_PROJECT1_PATH) }, 'print').name('Copy project 1 config')
+    project1Folder.open()
 
-    const lampFolder = gui.addFolder('Lamp')
-    createModelControls(lampFolder, LAMP_MODEL_PATH, {
-      size: { min: 0.5, max: 6 },
-      position: { x: [-8, 8], y: [-4, 4], z: [-8, 8] },
-      rotation: { x: [-Math.PI, Math.PI], y: [-Math.PI, Math.PI], z: [-Math.PI, Math.PI] },
-    })
-    lampFolder.add({ print: () => logModelConfig(LAMP_MODEL_PATH) }, 'print').name('Copy lamp config')
-
-    const clipFolder = gui.addFolder('CLIP')
-    createModelControls(clipFolder, CLIP_MODEL_PATH, {
-      size: { min: 0.1, max: 4 },
-      position: { x: [-8, 8], y: [-4, 4], z: [-8, 8] },
-      rotation: { x: [-Math.PI, Math.PI], y: [-Math.PI, Math.PI], z: [-Math.PI, Math.PI] },
-    })
-    clipFolder.add({ print: () => logModelConfig(CLIP_MODEL_PATH) }, 'print').name('Copy clip config')
+    const cameraFolder = gui.addFolder('Camera')
+    cameraFolder.add(camera.position, 'x', -20, 20, 0.01).name('position.x').onChange(() => controls.update())
+    cameraFolder.add(camera.position, 'y', -20, 20, 0.01).name('position.y').onChange(() => controls.update())
+    cameraFolder.add(camera.position, 'z', -20, 20, 0.01).name('position.z').onChange(() => controls.update())
+    cameraFolder.add(controls.target, 'x', -20, 20, 0.01).name('target.x').onChange(() => controls.update())
+    cameraFolder.add(controls.target, 'y', -20, 20, 0.01).name('target.y').onChange(() => controls.update())
+    cameraFolder.add(controls.target, 'z', -20, 20, 0.01).name('target.z').onChange(() => controls.update())
+    cameraFolder.add({ print: () => {
+      console.log(`Camera position: new THREE.Vector3(${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})`)
+      console.log(`Camera target: new THREE.Vector3(${controls.target.x.toFixed(2)}, ${controls.target.y.toFixed(2)}, ${controls.target.z.toFixed(2)})`)
+    }}, 'print').name('Copy camera config')
+    cameraFolder.open()
   }
 
   async function loadModels() {
