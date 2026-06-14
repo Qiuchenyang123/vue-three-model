@@ -7,6 +7,14 @@ const BOARD_MODEL_PATH = '/models/board_background.glb'
 const CLIP_MODEL_PATH = '/models/CLIP.glb'
 const LAMP_MODEL_PATH = '/models/lamp.glb'
 const BOARD_PROJECT1_PATH = '/models/board_project1.glb'
+const BOARD_PROJECT2_PATH = '/models/board_project2.glb'
+const BOARD_PROJECT3_PATH = '/models/board_project3.glb'
+const BOARD_PROJECT4_PATH = '/models/board_project4.glb'
+const BOARD_PROJECT5_PATH = '/models/board_project5.glb'
+const BOARD_PROJECT6_PATH = '/models/board_project6.glb'
+const BOARD_PROJECT7_PATH = '/models/board_project7.glb'
+const BOARD_PROJECT8_PATH = '/models/board_project8.glb'
+const COFFEE_MODEL_PATH = '/models/coffee.glb'
 const CAMERA_BASE_POSITION = new THREE.Vector3(7.12, 7.16, -0.06)
 const CAMERA_TARGET = new THREE.Vector3(0, 0.7, 0)
 const CAMERA_FORWARD_OFFSET = 1.25
@@ -24,6 +32,55 @@ const modelPlacements = [
     targetSize: new THREE.Vector3(1.05, 1.6, 1),
     position: new THREE.Vector3(-2.69, 3.45, 3.19),
     rotation: new THREE.Euler(0, 0, 0),
+    anchor: 'center',
+  },
+  {
+    path: '/models/board_project2.glb',
+    targetSize: new THREE.Vector3(1.05, 1.6, 2.8),
+    position: new THREE.Vector3(-2.63, 0.93, 2.13),
+    rotation: new THREE.Euler(0, 0, 0),
+    anchor: 'center',
+  },
+  {
+    path: '/models/board_project3.glb',
+    targetSize: new THREE.Vector3(1.05, 1.6, 1.46),
+    position: new THREE.Vector3(-2.67, 1.18, -0.14),
+    rotation: new THREE.Euler(0, 0, 0),
+    anchor: 'center',
+  },
+  {
+    path: '/models/board_project4.glb',
+    targetSize: new THREE.Vector3(1.05, 1.6, 1.09),
+    position: new THREE.Vector3(-2.67, 1.63, -1.56),
+    rotation: new THREE.Euler(0, 0, 0),
+    anchor: 'center',
+  },
+  {
+    path: '/models/board_project5.glb',
+    targetSize: new THREE.Vector3(1.05, 1.6, 1.44),
+    position: new THREE.Vector3(-2.66, 2.95, -1.89),
+    rotation: new THREE.Euler(0, 0, 0),
+    anchor: 'center',
+  },
+  {
+    path: '/models/board_project6.glb',
+    targetSize: new THREE.Vector3(1.05, 1.6, 1.99),
+    position: new THREE.Vector3(-2.68, 3.6, 0.15),
+    rotation: new THREE.Euler(0, 0, 0.03),
+    anchor: 'center',
+  },
+  {
+    path: '/models/board_project7.glb',
+    targetSize: new THREE.Vector3(1.05, 1.6, 1.08),
+    position: new THREE.Vector3(-2.66, 2.49, -0.18),
+    rotation: new THREE.Euler(0, 0, 0.01),
+    anchor: 'center',
+  },
+  {
+    path: '/models/board_project8.glb',
+    targetSize: new THREE.Vector3(1.05, 1.6, 1.36),
+    position: new THREE.Vector3(-2.62, 2.29, 1.71),
+    rotation: new THREE.Euler(0, 0, -0.01),
     anchor: 'center',
   },
   {
@@ -52,6 +109,13 @@ const modelPlacements = [
     targetSize: new THREE.Vector3(1.05, 0.45, 0.85),
     position: new THREE.Vector3(0, 0.86, 0),
     rotation: new THREE.Euler(0, 0.15, 0),
+    anchor: 'bottom',
+  },
+  {
+    path: '/models/coffee.glb',
+    targetSize: new THREE.Vector3(0.4, 0.4, 0.4),
+    position: new THREE.Vector3(1.5, 0.9, 1.5),
+    rotation: new THREE.Euler(0, 0, 0),
     anchor: 'bottom',
   },
 ]
@@ -367,14 +431,14 @@ export function useThreeDeskScene(options = {}) {
     gui = new GUI({ title: 'Scene Controls' })
     gui.domElement.style.zIndex = '30'
 
-    const project1Folder = gui.addFolder('Board Project 1')
-    createModelControls(project1Folder, BOARD_PROJECT1_PATH, {
-      size: { min: 0.1, max: 12 },
-      position: { x: [-8, 8], y: [-4, 8], z: [-10, 10] },
+    const coffeeFolder = gui.addFolder('Coffee')
+    createModelControls(coffeeFolder, COFFEE_MODEL_PATH, {
+      size: { min: 0.01, max: 5 },
+      position: { x: [-8, 8], y: [-2, 5], z: [-5, 5] },
       rotation: { x: [-Math.PI, Math.PI], y: [-Math.PI, Math.PI], z: [-Math.PI, Math.PI] },
     })
-    project1Folder.add({ print: () => logModelConfig(BOARD_PROJECT1_PATH) }, 'print').name('Copy project 1 config')
-    project1Folder.open()
+    coffeeFolder.add({ print: () => logModelConfig(COFFEE_MODEL_PATH) }, 'print').name('Copy coffee config')
+    coffeeFolder.open()
 
     const cameraFolder = gui.addFolder('Camera')
     cameraFolder.add(camera.position, 'x', -20, 20, 0.01).name('position.x').onChange(() => controls.update())
