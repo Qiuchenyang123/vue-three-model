@@ -2,6 +2,10 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 
 const BOARD_MODEL_PATH = '/models/board_background.glb'
 const CLIP_MODEL_PATH = '/models/CLIP.glb'
@@ -15,6 +19,30 @@ const BOARD_PROJECT6_PATH = '/models/board_project6.glb'
 const BOARD_PROJECT7_PATH = '/models/board_project7.glb'
 const BOARD_PROJECT8_PATH = '/models/board_project8.glb'
 const COFFEE_MODEL_PATH = '/models/coffee.glb'
+const PHONE_MODEL_PATH = '/models/phone.glb'
+
+const HOVERABLE_PATHS = [
+	BOARD_PROJECT1_PATH,
+	BOARD_PROJECT2_PATH,
+	BOARD_PROJECT3_PATH,
+	BOARD_PROJECT4_PATH,
+	BOARD_PROJECT5_PATH,
+	BOARD_PROJECT6_PATH,
+	BOARD_PROJECT7_PATH,
+	BOARD_PROJECT8_PATH,
+]
+
+const FOLDER_PATHS = [
+	'/models/Folder_project1.glb',
+	'/models/Folder_project2.glb',
+	'/models/Folder_project3.glb',
+	'/models/Folder_project4.glb',
+	'/models/Folder_project5.glb',
+	'/models/Folder_project6.glb',
+	'/models/Folder_project7.glb',
+	'/models/Folder_project8.glb',
+]
+
 const CAMERA_BASE_POSITION = new THREE.Vector3(7.12, 7.16, -0.06)
 const CAMERA_TARGET = new THREE.Vector3(0, 0.7, 0)
 const CAMERA_FORWARD_OFFSET = 1.25
@@ -93,7 +121,7 @@ const modelPlacements = [
 	{
 		path: '/models/lamp.glb',
 		targetSize: new THREE.Vector3(1.2, 2.7, 2.3),
-		position: new THREE.Vector3(0.03, 1.01, -1.11),
+		position: new THREE.Vector3(-0.2, 1.01, -1.11),
 		rotation: new THREE.Euler(0, 0.98, 0),
 		anchor: 'bottom',
 	},
@@ -114,10 +142,24 @@ const modelPlacements = [
 	{
 		path: '/models/coffee.glb',
 		targetSize: new THREE.Vector3(0.4, 0.4, 0.4),
-		position: new THREE.Vector3(1.5, 0.9, 1.5),
-		rotation: new THREE.Euler(0, 0, 0),
+		position: new THREE.Vector3(0.61, 1, -1.22),
+		rotation: new THREE.Euler(0, -Math.PI / 2, 0),
 		anchor: 'bottom',
 	},
+	{
+		path: '/models/phone.glb',
+		targetSize: new THREE.Vector3(1.21, 1.21, 1.21),
+		position: new THREE.Vector3(-0.42, 1, 1.7),
+		rotation: new THREE.Euler(0, 1.78, 0),
+		anchor: 'bottom',
+	},
+	...FOLDER_PATHS.map((path) => ({
+		path,
+		targetSize: new THREE.Vector3(1.05, 0.45, 0.85),
+		position: new THREE.Vector3(0, 0.86, 0),
+		rotation: new THREE.Euler(0, 0.15, 0),
+		anchor: 'bottom',
+	})),
 ]
 
 export function useThreeDeskScene(options = {}) {
@@ -132,6 +174,19 @@ export function useThreeDeskScene(options = {}) {
 	let canvasContainer = null
 	let removeResizeListener = null
 	let gui = null
+
+	let composer
+	let outlinePass
+	let raycaster
+	let mouse
+	let hoverableObjects = []
+
+	let isAnimatingCamera = false
+	let targetCameraPos = new THREE.Vector3()
+	let targetControlsPos = new THREE.Vector3()
+
+	const mixers = []
+	const clock = new THREE.Clock()
 
 	const disposables = new Set()
 	const modelEntries = new Map()
@@ -166,6 +221,84 @@ export function useThreeDeskScene(options = {}) {
 		camera.aspect = clientWidth / clientHeight
 		camera.updateProjectionMatrix()
 		renderer.setSize(clientWidth, clientHeight)
+		if (composer) {
+			composer.setSize(clientWidth, clientHeight)
+		}
+	}
+
+	function onPointerMove(event) {
+		if (!canvasContainer) return
+		const rect = canvasContainer.getBoundingClientRect()
+		mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+		mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+	}
+
+	function onPointerDown(event) {
+		if (!canvasContainer || !raycaster || !camera || hoverableObjects.length === 0) return
+
+		raycaster.setFromCamera(mouse, camera)
+		const intersects = raycaster.intersectObjects(hoverableObjects, true)
+
+		if (intersects.length > 0) {
+			let object = intersects[0].object
+			let rootObject = null
+			
+			object.traverseAncestors((ancestor) => {
+				if (hoverableObjects.includes(ancestor)) {
+					rootObject = ancestor
+				}
+			})
+			if (!rootObject && hoverableObjects.includes(object)) {
+				rootObject = object
+			}
+
+			if (rootObject) {
+				let clickedPath = null
+				modelEntries.forEach((entry, path) => {
+					if (entry.root === rootObject) clickedPath = path
+				})
+
+				if (clickedPath) {
+					const match = clickedPath.match(/board_project(\d+)\.glb/)
+					if (match) {
+						const index = match[1]
+						const folderPath = `/models/Folder_project${index}.glb`
+
+						// Hide all folders
+						FOLDER_PATHS.forEach((path) => {
+							const entry = modelEntries.get(path)
+							if (entry) entry.root.visible = false
+						})
+
+						// Show target folder
+						const folderEntry = modelEntries.get(folderPath)
+						if (folderEntry) {
+							folderEntry.root.visible = true
+
+							// Set camera animation targets
+							const folderBox = new THREE.Box3().setFromObject(folderEntry.root)
+							const folderCenter = folderBox.getCenter(new THREE.Vector3())
+							
+							targetControlsPos.copy(folderCenter)
+							// Position camera closer to the folder
+							targetCameraPos.copy(folderCenter).add(new THREE.Vector3(1.5, 1.5, 1.5))
+							isAnimatingCamera = true
+						}
+					}
+
+					const folderMatch = clickedPath.match(/Folder_project(\d+)\.glb/)
+					if (folderMatch) {
+						const entry = modelEntries.get(clickedPath)
+						if (entry && entry.mixer && entry.animations && entry.animations.length > 0) {
+							const action = entry.mixer.clipAction(entry.animations[0])
+							action.setLoop(THREE.LoopOnce, 1)
+							action.clampWhenFinished = true
+							action.reset().play()
+						}
+					}
+				}
+			}
+		}
 	}
 
 	function createScene(container) {
@@ -201,13 +334,40 @@ export function useThreeDeskScene(options = {}) {
 		controls.maxPolarAngle = 3.38
 		controls.target.copy(CAMERA_TARGET)
 
+		// Post-processing
+		composer = new EffectComposer(renderer)
+
+		const renderPass = new RenderPass(scene, camera)
+		composer.addPass(renderPass)
+
+		outlinePass = new OutlinePass(new THREE.Vector2(container.clientWidth, container.clientHeight), scene, camera)
+		outlinePass.edgeStrength = 4.0
+		outlinePass.edgeGlow = 1.0
+		outlinePass.edgeThickness = 2.0
+		outlinePass.pulsePeriod = 0
+		outlinePass.visibleEdgeColor.set('#ffffff')
+		outlinePass.hiddenEdgeColor.set('#ffffff')
+		composer.addPass(outlinePass)
+
+		const outputPass = new OutputPass()
+		composer.addPass(outputPass)
+
+		raycaster = new THREE.Raycaster()
+		mouse = new THREE.Vector2()
+
 		addLights(scene)
 		addEnvironment(scene)
 
 		resizeObserver = new ResizeObserver(updateSize)
 		resizeObserver.observe(container)
 		window.addEventListener("resize", updateSize)
-		removeResizeListener = () => window.removeEventListener("resize", updateSize)
+		container.addEventListener("pointermove", onPointerMove)
+		container.addEventListener("pointerdown", onPointerDown)
+		removeResizeListener = () => {
+			window.removeEventListener("resize", updateSize)
+			container.removeEventListener("pointermove", onPointerMove)
+			container.removeEventListener("pointerdown", onPointerDown)
+		}
 		emitCameraState()
 	}
 
@@ -431,14 +591,14 @@ export function useThreeDeskScene(options = {}) {
 		gui = new GUI({ title: 'Scene Controls' })
 		gui.domElement.style.zIndex = '30'
 
-		const coffeeFolder = gui.addFolder('Coffee')
-		createModelControls(coffeeFolder, COFFEE_MODEL_PATH, {
-			size: { min: 0.01, max: 5 },
+		const phoneFolder = gui.addFolder('Phone')
+		createModelControls(phoneFolder, PHONE_MODEL_PATH, {
+			size: { min: 0.01, max: 2 },
 			position: { x: [-8, 8], y: [-2, 5], z: [-5, 5] },
 			rotation: { x: [-Math.PI, Math.PI], y: [-Math.PI, Math.PI], z: [-Math.PI, Math.PI] },
 		})
-		coffeeFolder.add({ print: () => logModelConfig(COFFEE_MODEL_PATH) }, 'print').name('Copy coffee config')
-		coffeeFolder.open()
+		phoneFolder.add({ print: () => logModelConfig(PHONE_MODEL_PATH) }, 'print').name('Copy phone config')
+		phoneFolder.open()
 
 		const cameraFolder = gui.addFolder('Camera')
 		cameraFolder.add(camera.position, 'x', -20, 20, 0.01).name('position.x').onChange(() => controls.update())
@@ -481,17 +641,76 @@ export function useThreeDeskScene(options = {}) {
 				})
 
 				fitModel(root, config)
-				modelEntries.set(config.path, { root, config })
+
+				let mixer = null
+				if (gltf.animations && gltf.animations.length > 0) {
+					mixer = new THREE.AnimationMixer(root)
+					mixers.push(mixer)
+				}
+
+				modelEntries.set(config.path, { root, config, mixer, animations: gltf.animations })
 				scene.add(root)
+
+				if (HOVERABLE_PATHS.includes(config.path) || FOLDER_PATHS.includes(config.path)) {
+					hoverableObjects.push(root)
+				}
+
+				if (FOLDER_PATHS.includes(config.path)) {
+					root.visible = false
+				}
 			}),
 		)
 	}
 
 	function animate() {
 		animationFrameId = window.requestAnimationFrame(animate)
+
+		if (isAnimatingCamera) {
+			camera.position.lerp(targetCameraPos, 0.05)
+			controls.target.lerp(targetControlsPos, 0.05)
+
+			if (camera.position.distanceTo(targetCameraPos) < 0.01 && controls.target.distanceTo(targetControlsPos) < 0.01) {
+				isAnimatingCamera = false
+			}
+		}
+
+		const delta = clock.getDelta()
+		mixers.forEach((mixer) => mixer.update(delta))
+
 		controls.update()
 		emitCameraState()
-		renderer.render(scene, camera)
+
+		if (raycaster && mouse && camera && hoverableObjects.length > 0) {
+			raycaster.setFromCamera(mouse, camera)
+			const intersects = raycaster.intersectObjects(hoverableObjects, true)
+			
+			if (intersects.length > 0) {
+				let object = intersects[0].object
+				let rootObject = null
+				
+				object.traverseAncestors((ancestor) => {
+					if (hoverableObjects.includes(ancestor)) {
+						rootObject = ancestor
+					}
+				})
+				
+				if (!rootObject && hoverableObjects.includes(object)) {
+					rootObject = object
+				}
+				
+				if (rootObject) {
+					outlinePass.selectedObjects = [rootObject]
+				}
+			} else {
+				outlinePass.selectedObjects = []
+			}
+		}
+
+		if (composer) {
+			composer.render()
+		} else {
+			renderer.render(scene, camera)
+		}
 	}
 
 	async function mount(container) {
