@@ -3,5 +3,5 @@ import ThreeModelView from './ThreeModelView.vue'
 </script>
 
 <template>
-  <ThreeModelView />
+	<ThreeModelView />
 </template>
