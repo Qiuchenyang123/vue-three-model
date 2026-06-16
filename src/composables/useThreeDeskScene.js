@@ -30,6 +30,7 @@ const HOVERABLE_PATHS = [
 	BOARD_PROJECT6_PATH,
 	BOARD_PROJECT7_PATH,
 	BOARD_PROJECT8_PATH,
+	'/models/folder_pause.glb',
 ]
 
 const FOLDER_PATHS = [
@@ -128,15 +129,15 @@ const modelPlacements = [
 	{
 		path: '/models/CLIP.glb',
 		targetSize: new THREE.Vector3(2.27, 0.6, 1.26),
-		position: new THREE.Vector3(0.24, 1, 2.46),
-		rotation: new THREE.Euler(0, 2.46, 0),
+		position: new THREE.Vector3(0.44, 1, 2.52),
+		rotation: new THREE.Euler(0, 2.76, 0),
 		anchor: 'bottom',
 	},
 	{
 		path: '/models/folder_pause.glb',
-		targetSize: new THREE.Vector3(1.05, 0.45, 0.85),
-		position: new THREE.Vector3(0, 0.86, 0),
-		rotation: new THREE.Euler(0, 0.15, 0),
+		targetSize: new THREE.Vector3(3, 3, 3),
+		position: new THREE.Vector3(0.3, 0.51, 0),
+		rotation: new THREE.Euler(0, 1.62, 0),
 		anchor: 'bottom',
 	},
 	{
@@ -149,18 +150,23 @@ const modelPlacements = [
 	{
 		path: '/models/phone.glb',
 		targetSize: new THREE.Vector3(1.21, 1.21, 1.21),
-		position: new THREE.Vector3(-0.42, 1, 1.7),
+		position: new THREE.Vector3(-0.42, 1, 2.24),
 		rotation: new THREE.Euler(0, 1.78, 0),
 		anchor: 'bottom',
 	},
 	...FOLDER_PATHS.map((path) => ({
 		path,
-		targetSize: new THREE.Vector3(1.05, 0.45, 0.85),
-		position: new THREE.Vector3(0, 0.86, 0),
-		rotation: new THREE.Euler(0, 0.15, 0),
+		targetSize: new THREE.Vector3(3, 3, 3),
+		position: new THREE.Vector3(0.3, 0.49, 0),
+		rotation: new THREE.Euler(0, 1.62, 0),
 		anchor: 'bottom',
 	})),
 ]
+
+const folderCameraConfig = {
+	position: {x: 0.47, y: 4.7, z: 0},
+	target: {x: 0, y: -2.08, z: 0}
+}
 
 export function useThreeDeskScene(options = {}) {
 	const { enableGui = import.meta.env.DEV, onCameraChange } = options
@@ -184,6 +190,7 @@ export function useThreeDeskScene(options = {}) {
 	let isAnimatingCamera = false
 	let targetCameraPos = new THREE.Vector3()
 	let targetControlsPos = new THREE.Vector3()
+	let currentFolderIndex = null
 
 	const mixers = []
 	const clock = new THREE.Clock()
@@ -242,7 +249,7 @@ export function useThreeDeskScene(options = {}) {
 		if (intersects.length > 0) {
 			let object = intersects[0].object
 			let rootObject = null
-			
+
 			object.traverseAncestors((ancestor) => {
 				if (hoverableObjects.includes(ancestor)) {
 					rootObject = ancestor
@@ -262,38 +269,64 @@ export function useThreeDeskScene(options = {}) {
 					const match = clickedPath.match(/board_project(\d+)\.glb/)
 					if (match) {
 						const index = match[1]
-						const folderPath = `/models/Folder_project${index}.glb`
+						currentFolderIndex = index
 
-						// Hide all folders
+						// Hide all folder projects
 						FOLDER_PATHS.forEach((path) => {
 							const entry = modelEntries.get(path)
 							if (entry) entry.root.visible = false
 						})
 
-						// Show target folder
-						const folderEntry = modelEntries.get(folderPath)
-						if (folderEntry) {
-							folderEntry.root.visible = true
+						// Show folder_pause model
+						const folderPauseEntry = modelEntries.get('/models/folder_pause.glb')
+						if (folderPauseEntry) {
+							folderPauseEntry.root.visible = true
+
+							// Play fall animation (0 to 24 frames)
+							if (folderPauseEntry.mixer && folderPauseEntry.animations && folderPauseEntry.animations.length > 0) {
+								const action = folderPauseEntry.mixer.clipAction(folderPauseEntry.animations[0])
+								// Assuming 24 fps, 24 frames = 1 second
+								action.time = 0
+								action.setLoop(THREE.LoopOnce, 1)
+								action.clampWhenFinished = true
+
+								// Reset any previous state
+								action.paused = false
+								action.reset().play()
+
+								folderPauseEntry.isFalling = true
+							}
 
 							// Set camera animation targets
-							const folderBox = new THREE.Box3().setFromObject(folderEntry.root)
-							const folderCenter = folderBox.getCenter(new THREE.Vector3())
-							
-							targetControlsPos.copy(folderCenter)
-							// Position camera closer to the folder
-							targetCameraPos.copy(folderCenter).add(new THREE.Vector3(1.5, 1.5, 1.5))
+							targetControlsPos.copy(new THREE.Vector3(folderCameraConfig.target.x, folderCameraConfig.target.y, folderCameraConfig.target.z))
+							targetCameraPos.copy(new THREE.Vector3(folderCameraConfig.position.x, folderCameraConfig.position.y, folderCameraConfig.position.z))
 							isAnimatingCamera = true
 						}
 					}
 
-					const folderMatch = clickedPath.match(/Folder_project(\d+)\.glb/)
-					if (folderMatch) {
-						const entry = modelEntries.get(clickedPath)
-						if (entry && entry.mixer && entry.animations && entry.animations.length > 0) {
-							const action = entry.mixer.clipAction(entry.animations[0])
-							action.setLoop(THREE.LoopOnce, 1)
-							action.clampWhenFinished = true
-							action.reset().play()
+					// Click on folder_pause
+					if (clickedPath === '/models/folder_pause.glb' && currentFolderIndex) {
+						const folderPauseEntry = modelEntries.get('/models/folder_pause.glb')
+						if (folderPauseEntry) {
+							folderPauseEntry.root.visible = false
+						}
+
+						const folderPath = `/models/Folder_project${currentFolderIndex}.glb`
+						const folderEntry = modelEntries.get(folderPath)
+
+						if (folderEntry) {
+							folderEntry.root.visible = true
+
+							if (folderEntry.mixer && folderEntry.animations && folderEntry.animations.length > 0) {
+								const action = folderEntry.mixer.clipAction(folderEntry.animations[0])
+								// Start from frame 24 (1.0 second) and play to the end
+								action.paused = false
+								action.time = 1.0
+								action.setLoop(THREE.LoopOnce, 1)
+								action.clampWhenFinished = true
+								action.play()
+								folderEntry.isFalling = false
+							}
 						}
 					}
 				}
@@ -327,12 +360,16 @@ export function useThreeDeskScene(options = {}) {
 
 		controls = new OrbitControls(camera, renderer.domElement)
 		controls.enableDamping = true
-		controls.enablePan = false
+		controls.enablePan = true
 		controls.minDistance = 0.8
 		controls.maxDistance = 13
 		controls.minPolarAngle = 0.1
 		controls.maxPolarAngle = 3.38
 		controls.target.copy(CAMERA_TARGET)
+
+		controls.addEventListener('start', () => {
+			isAnimatingCamera = false
+		})
 
 		// Post-processing
 		composer = new EffectComposer(renderer)
@@ -485,7 +522,36 @@ export function useThreeDeskScene(options = {}) {
 			return
 		}
 
+		let action = null
+		let prevTime = 0
+		let prevMixerTime = 0
+		let wasPlaying = false
+		let wasPaused = false
+
+		if (entry.mixer && entry.animations && entry.animations.length > 0) {
+			action = entry.mixer.clipAction(entry.animations[0])
+			wasPlaying = action.isRunning()
+			wasPaused = action.paused
+			prevTime = action.time
+			prevMixerTime = entry.mixer.time
+
+			// 快进到第 24 帧（1.0秒），使模型处于落地状态，从而计算准确的包围盒和落点
+			action.paused = false
+			action.play()
+			entry.mixer.setTime(1.0)
+		}
+
 		fitModel(entry.root, entry.config)
+
+		if (entry.mixer && action) {
+			// 恢复动画原始状态
+			if (!wasPlaying) {
+				action.stop()
+			}
+			action.paused = wasPaused
+			action.time = prevTime
+			entry.mixer.setTime(prevMixerTime)
+		}
 	}
 
 	function emitCameraState() {
@@ -551,7 +617,7 @@ export function useThreeDeskScene(options = {}) {
 		)
 	}
 
-	function createModelControls(folder, modelPath, ranges = {}) {
+	function createModelControls(folder, modelPath, ranges = {}, onChangeCallback = null) {
 		const entry = modelEntries.get(modelPath)
 
 		if (!entry) {
@@ -565,22 +631,39 @@ export function useThreeDeskScene(options = {}) {
 			rotation = { x: [-Math.PI, Math.PI], y: [-Math.PI, Math.PI], z: [-Math.PI, Math.PI] },
 		} = ranges
 
+		const handleChange = onChangeCallback || (() => updateModelTransform(modelPath))
+
 		const sizeFolder = folder.addFolder('Size')
-		sizeFolder.add(config.targetSize, 'x', size.min, size.max, 0.01).name('width').onChange(() => updateModelTransform(modelPath))
-		sizeFolder.add(config.targetSize, 'y', size.min, size.max, 0.01).name('height').onChange(() => updateModelTransform(modelPath))
-		sizeFolder.add(config.targetSize, 'z', size.min, size.max, 0.01).name('depth').onChange(() => updateModelTransform(modelPath))
+		sizeFolder.add(config.targetSize, 'x', size.min, size.max, 0.01).name('width').onChange(handleChange)
+		sizeFolder.add(config.targetSize, 'y', size.min, size.max, 0.01).name('height').onChange(handleChange)
+		sizeFolder.add(config.targetSize, 'z', size.min, size.max, 0.01).name('depth').onChange(handleChange)
 		sizeFolder.open()
 
 		const positionFolder = folder.addFolder('Position')
-		positionFolder.add(config.position, 'x', position.x[0], position.x[1], 0.01).name('x').onChange(() => updateModelTransform(modelPath))
-		positionFolder.add(config.position, 'y', position.y[0], position.y[1], 0.01).name('y').onChange(() => updateModelTransform(modelPath))
-		positionFolder.add(config.position, 'z', position.z[0], position.z[1], 0.01).name('z').onChange(() => updateModelTransform(modelPath))
+		positionFolder.add(config.position, 'x', position.x[0], position.x[1], 0.01).name('x').onChange(handleChange)
+		positionFolder.add(config.position, 'y', position.y[0], position.y[1], 0.01).name('y').onChange(handleChange)
+		positionFolder.add(config.position, 'z', position.z[0], position.z[1], 0.01).name('z').onChange(handleChange)
 		positionFolder.open()
 
 		const rotationFolder = folder.addFolder('Rotation')
-		rotationFolder.add(config.rotation, 'x', rotation.x[0], rotation.x[1], 0.01).name('x').onChange(() => updateModelTransform(modelPath))
-		rotationFolder.add(config.rotation, 'y', rotation.y[0], rotation.y[1], 0.01).name('y').onChange(() => updateModelTransform(modelPath))
-		rotationFolder.add(config.rotation, 'z', rotation.z[0], rotation.z[1], 0.01).name('z').onChange(() => updateModelTransform(modelPath))
+		rotationFolder.add(config.rotation, 'x', rotation.x[0], rotation.x[1], 0.01).name('x').onChange(handleChange)
+		rotationFolder.add(config.rotation, 'y', rotation.y[0], rotation.y[1], 0.01).name('y').onChange(handleChange)
+		rotationFolder.add(config.rotation, 'z', rotation.z[0], rotation.z[1], 0.01).name('z').onChange(handleChange)
+	}
+
+	function updateFolderTransforms() {
+		const baseEntry = modelEntries.get(FOLDER_PATHS[0])
+		if (!baseEntry) return
+
+		FOLDER_PATHS.forEach(path => {
+			const entry = modelEntries.get(path)
+			if (entry) {
+				entry.config.targetSize.copy(baseEntry.config.targetSize)
+				entry.config.position.copy(baseEntry.config.position)
+				entry.config.rotation.copy(baseEntry.config.rotation)
+				updateModelTransform(path)
+			}
+		})
 	}
 
 	function createTransformGui() {
@@ -599,6 +682,24 @@ export function useThreeDeskScene(options = {}) {
 		})
 		phoneFolder.add({ print: () => logModelConfig(PHONE_MODEL_PATH) }, 'print').name('Copy phone config')
 		phoneFolder.open()
+
+		const folderProjectFolder = gui.addFolder('Folder Project')
+		createModelControls(folderProjectFolder, FOLDER_PATHS[0], {
+			size: { min: 0.01, max: 5 },
+			position: { x: [-8, 8], y: [-2, 8], z: [-5, 5] },
+			rotation: { x: [-Math.PI, Math.PI], y: [-Math.PI, Math.PI], z: [-Math.PI, Math.PI] },
+		}, updateFolderTransforms)
+		folderProjectFolder.add({ print: () => logModelConfig(FOLDER_PATHS[0]) }, 'print').name('Copy folder config')
+		folderProjectFolder.open()
+
+		const folderPauseFolder = gui.addFolder('Folder Pause')
+		createModelControls(folderPauseFolder, '/models/folder_pause.glb', {
+			size: { min: 0.01, max: 5 },
+			position: { x: [-8, 8], y: [-2, 8], z: [-5, 5] },
+			rotation: { x: [-Math.PI, Math.PI], y: [-Math.PI, Math.PI], z: [-Math.PI, Math.PI] },
+		})
+		folderPauseFolder.add({ print: () => logModelConfig('/models/folder_pause.glb') }, 'print').name('Copy folder pause config')
+		folderPauseFolder.open()
 
 		const cameraFolder = gui.addFolder('Camera')
 		cameraFolder.add(camera.position, 'x', -20, 20, 0.01).name('position.x').onChange(() => controls.update())
@@ -640,8 +741,6 @@ export function useThreeDeskScene(options = {}) {
 					trackMaterial(child.material)
 				})
 
-				fitModel(root, config)
-
 				let mixer = null
 				if (gltf.animations && gltf.animations.length > 0) {
 					mixer = new THREE.AnimationMixer(root)
@@ -649,13 +748,17 @@ export function useThreeDeskScene(options = {}) {
 				}
 
 				modelEntries.set(config.path, { root, config, mixer, animations: gltf.animations })
+
+				// Use updateModelTransform instead of fitModel directly to handle animation bounding boxes correctly
+				updateModelTransform(config.path)
+
 				scene.add(root)
 
 				if (HOVERABLE_PATHS.includes(config.path) || FOLDER_PATHS.includes(config.path)) {
 					hoverableObjects.push(root)
 				}
 
-				if (FOLDER_PATHS.includes(config.path)) {
+				if (FOLDER_PATHS.includes(config.path) || config.path === '/models/folder_pause.glb') {
 					root.visible = false
 				}
 			}),
@@ -669,13 +772,27 @@ export function useThreeDeskScene(options = {}) {
 			camera.position.lerp(targetCameraPos, 0.05)
 			controls.target.lerp(targetControlsPos, 0.05)
 
-			if (camera.position.distanceTo(targetCameraPos) < 0.01 && controls.target.distanceTo(targetControlsPos) < 0.01) {
+			if (camera.position.distanceTo(targetCameraPos) < 0.1 && controls.target.distanceTo(targetControlsPos) < 0.1) {
 				isAnimatingCamera = false
 			}
 		}
 
 		const delta = clock.getDelta()
-		mixers.forEach((mixer) => mixer.update(delta))
+		mixers.forEach((mixer) => {
+			mixer.update(delta)
+		})
+
+		// Track animation progress to stop at frame 24
+		modelEntries.forEach((entry) => {
+			if (entry.isFalling && entry.mixer && entry.animations.length > 0) {
+				const action = entry.mixer.clipAction(entry.animations[0])
+				// Stop at 1 second (24 frames)
+				if (action.time >= 1.0) {
+					action.paused = true
+					entry.isFalling = false
+				}
+			}
+		})
 
 		controls.update()
 		emitCameraState()
@@ -683,21 +800,21 @@ export function useThreeDeskScene(options = {}) {
 		if (raycaster && mouse && camera && hoverableObjects.length > 0) {
 			raycaster.setFromCamera(mouse, camera)
 			const intersects = raycaster.intersectObjects(hoverableObjects, true)
-			
+
 			if (intersects.length > 0) {
 				let object = intersects[0].object
 				let rootObject = null
-				
+
 				object.traverseAncestors((ancestor) => {
 					if (hoverableObjects.includes(ancestor)) {
 						rootObject = ancestor
 					}
 				})
-				
+
 				if (!rootObject && hoverableObjects.includes(object)) {
 					rootObject = object
 				}
-				
+
 				if (rootObject) {
 					outlinePass.selectedObjects = [rootObject]
 				}
