@@ -20,6 +20,7 @@ const BOARD_PROJECT7_PATH = '/models/board_project7.glb'
 const BOARD_PROJECT8_PATH = '/models/board_project8.glb'
 const COFFEE_MODEL_PATH = '/models/coffee.glb'
 const PHONE_MODEL_PATH = '/models/phone.glb'
+const FOLDER_PAUSE_PATH = '/models/folder_pause.glb'
 
 const HOVERABLE_PATHS = [
 	BOARD_PROJECT1_PATH,
@@ -30,7 +31,7 @@ const HOVERABLE_PATHS = [
 	BOARD_PROJECT6_PATH,
 	BOARD_PROJECT7_PATH,
 	BOARD_PROJECT8_PATH,
-	'/models/folder_pause.glb',
+	FOLDER_PAUSE_PATH,
 ]
 
 const FOLDER_PATHS = [
@@ -190,7 +191,16 @@ export function useThreeDeskScene(options = {}) {
 	let isAnimatingCamera = false
 	let targetCameraPos = new THREE.Vector3()
 	let targetControlsPos = new THREE.Vector3()
-	let currentFolderIndex = null
+
+	let activeProjectIndex = null
+	let isFolderFalling = false
+	let isFolderOpening = false
+	let activePauseAction = null
+	const ANIMATION_FPS = 24
+	const PAUSE_FRAME = 24
+	const PAUSE_TIME = PAUSE_FRAME / ANIMATION_FPS
+	const SWITCH_FRAME = 58
+	const SWITCH_TIME = SWITCH_FRAME / ANIMATION_FPS
 
 	const mixers = []
 	const clock = new THREE.Clock()
@@ -268,8 +278,7 @@ export function useThreeDeskScene(options = {}) {
 				if (clickedPath) {
 					const match = clickedPath.match(/board_project(\d+)\.glb/)
 					if (match) {
-						const index = match[1]
-						currentFolderIndex = index
+						activeProjectIndex = match[1]
 
 						// Hide all folder projects
 						FOLDER_PATHS.forEach((path) => {
@@ -278,23 +287,19 @@ export function useThreeDeskScene(options = {}) {
 						})
 
 						// Show folder_pause model
-						const folderPauseEntry = modelEntries.get('/models/folder_pause.glb')
-						if (folderPauseEntry) {
-							folderPauseEntry.root.visible = true
-
-							// Play fall animation (0 to 24 frames)
-							if (folderPauseEntry.mixer && folderPauseEntry.animations && folderPauseEntry.animations.length > 0) {
-								const action = folderPauseEntry.mixer.clipAction(folderPauseEntry.animations[0])
-								// Assuming 24 fps, 24 frames = 1 second
-								action.time = 0
-								action.setLoop(THREE.LoopOnce, 1)
-								action.clampWhenFinished = true
-
-								// Reset any previous state
-								action.paused = false
-								action.reset().play()
-
-								folderPauseEntry.isFalling = true
+						const pauseEntry = modelEntries.get(FOLDER_PAUSE_PATH)
+						if (pauseEntry) {
+							pauseEntry.root.visible = true
+							if (pauseEntry.mixer && pauseEntry.animations.length > 0) {
+								pauseEntry.mixer.stopAllAction()
+								activePauseAction = pauseEntry.mixer.clipAction(pauseEntry.animations[0])
+								activePauseAction.reset()
+								activePauseAction.setLoop(THREE.LoopOnce, 1)
+								activePauseAction.clampWhenFinished = true
+								activePauseAction.play()
+								activePauseAction.paused = false
+								isFolderFalling = true
+								isFolderOpening = false
 							}
 
 							// Set camera animation targets
@@ -304,29 +309,23 @@ export function useThreeDeskScene(options = {}) {
 						}
 					}
 
-					// Click on folder_pause
-					if (clickedPath === '/models/folder_pause.glb' && currentFolderIndex) {
-						const folderPauseEntry = modelEntries.get('/models/folder_pause.glb')
-						if (folderPauseEntry) {
-							folderPauseEntry.root.visible = false
+					if (clickedPath === FOLDER_PAUSE_PATH && activeProjectIndex && !isFolderFalling) {
+						if (activePauseAction) {
+							activePauseAction.paused = false
+							isFolderOpening = true
 						}
+					}
 
-						const folderPath = `/models/Folder_project${currentFolderIndex}.glb`
-						const folderEntry = modelEntries.get(folderPath)
-
-						if (folderEntry) {
-							folderEntry.root.visible = true
-
-							if (folderEntry.mixer && folderEntry.animations && folderEntry.animations.length > 0) {
-								const action = folderEntry.mixer.clipAction(folderEntry.animations[0])
-								// Start from frame 24 (1.0 second) and play to the end
-								action.paused = false
-								action.time = 1.0
-								action.setLoop(THREE.LoopOnce, 1)
-								action.clampWhenFinished = true
-								action.play()
-								folderEntry.isFalling = false
-							}
+					const folderMatch = clickedPath.match(/Folder_project(\d+)\.glb/)
+					if (folderMatch) {
+						const entry = modelEntries.get(clickedPath)
+						if (entry && entry.mixer && entry.animations && entry.animations.length > 0) {
+							const action = entry.mixer.clipAction(entry.animations[0])
+							action.reset()
+							action.time = 0
+							action.setLoop(THREE.LoopOnce, 1)
+							action.clampWhenFinished = true
+							action.play()
 						}
 					}
 				}
@@ -778,21 +777,40 @@ export function useThreeDeskScene(options = {}) {
 		}
 
 		const delta = clock.getDelta()
-		mixers.forEach((mixer) => {
-			mixer.update(delta)
-		})
+		mixers.forEach((mixer) => mixer.update(delta))
 
-		// Track animation progress to stop at frame 24
-		modelEntries.forEach((entry) => {
-			if (entry.isFalling && entry.mixer && entry.animations.length > 0) {
-				const action = entry.mixer.clipAction(entry.animations[0])
-				// Stop at 1 second (24 frames)
-				if (action.time >= 1.0) {
-					action.paused = true
-					entry.isFalling = false
+		if (isFolderFalling && activePauseAction) {
+			if (activePauseAction.time >= PAUSE_TIME) {
+				isFolderFalling = false
+				activePauseAction.paused = true
+				activePauseAction.time = PAUSE_TIME
+			}
+		}
+
+		if (isFolderOpening && activePauseAction) {
+			const duration = activePauseAction.getClip().duration
+			if (activePauseAction.time >= duration - 0.001) {
+				isFolderOpening = false
+				activePauseAction.paused = true
+
+				const pauseEntry = modelEntries.get(FOLDER_PAUSE_PATH)
+				if (pauseEntry) pauseEntry.root.visible = false
+
+				const targetPath = `/models/Folder_project${activeProjectIndex}.glb`
+				const targetEntry = modelEntries.get(targetPath)
+				if (targetEntry) {
+					targetEntry.root.visible = true
+					if (targetEntry.mixer && targetEntry.animations.length > 0) {
+						const action = targetEntry.mixer.clipAction(targetEntry.animations[0])
+						action.reset()
+						action.time = action.getClip().duration
+						action.setLoop(THREE.LoopOnce, 1)
+						action.clampWhenFinished = true
+						action.play()
+					}
 				}
 			}
-		})
+		}
 
 		controls.update()
 		emitCameraState()
