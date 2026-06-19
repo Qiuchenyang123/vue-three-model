@@ -158,7 +158,7 @@ const modelPlacements = [
 	...FOLDER_PATHS.map((path) => ({
 		path,
 		targetSize: new THREE.Vector3(3, 3, 3),
-		position: new THREE.Vector3(0.3, 0.49, 0),
+		position: new THREE.Vector3(0.3, 0.49, 0.4),
 		rotation: new THREE.Euler(0, 1.62, 0),
 		anchor: 'bottom',
 	})),
@@ -192,10 +192,9 @@ export function useThreeDeskScene(options = {}) {
 	let targetCameraPos = new THREE.Vector3()
 	let targetControlsPos = new THREE.Vector3()
 
-	let activeProjectIndex = null
 	let isFolderFalling = false
 	let isFolderOpening = false
-	let activePauseAction = null
+	let activeProjectIndex = null
 	const ANIMATION_FPS = 24
 	const PAUSE_FRAME = 24
 	const PAUSE_TIME = PAUSE_FRAME / ANIMATION_FPS
@@ -286,18 +285,36 @@ export function useThreeDeskScene(options = {}) {
 							if (entry) entry.root.visible = false
 						})
 
-						// Show folder_pause model
+						// Hide folder pause just in case
 						const pauseEntry = modelEntries.get(FOLDER_PAUSE_PATH)
 						if (pauseEntry) {
-							pauseEntry.root.visible = true
-							if (pauseEntry.mixer && pauseEntry.animations.length > 0) {
-								pauseEntry.mixer.stopAllAction()
-								activePauseAction = pauseEntry.mixer.clipAction(pauseEntry.animations[0])
-								activePauseAction.reset()
-								activePauseAction.setLoop(THREE.LoopOnce, 1)
-								activePauseAction.clampWhenFinished = true
-								activePauseAction.play()
-								activePauseAction.paused = false
+							pauseEntry.root.visible = false
+						}
+
+						// Show target Folder_project
+						const folderPath = `/models/Folder_project${activeProjectIndex}.glb`
+						const folderEntry = modelEntries.get(folderPath)
+						if (folderEntry) {
+							folderEntry.root.visible = true
+							if (folderEntry.mixer && folderEntry.animations.length > 0) {
+								folderEntry.mixer.stopAllAction()
+								folderEntry.animations.forEach((anim, index) => {
+									const action = folderEntry.mixer.clipAction(anim)
+									action.reset()
+									action.setLoop(THREE.LoopOnce, 1)
+									action.clampWhenFinished = true
+
+									// 整体跳过前4帧，基础起始时间为 4/24 秒
+									// 如果是 animations[1]，再额外提前 2 帧，即 6/24 秒
+									/* if (index === 1) {
+										action.time = 6 / ANIMATION_FPS
+									} else {
+									} */
+										action.time = 16 / ANIMATION_FPS
+
+									action.play()
+									action.paused = false
+								})
 								isFolderFalling = true
 								isFolderOpening = false
 							}
@@ -309,23 +326,16 @@ export function useThreeDeskScene(options = {}) {
 						}
 					}
 
-					if (clickedPath === FOLDER_PAUSE_PATH && activeProjectIndex && !isFolderFalling) {
-						if (activePauseAction) {
-							activePauseAction.paused = false
-							isFolderOpening = true
-						}
-					}
-
 					const folderMatch = clickedPath.match(/Folder_project(\d+)\.glb/)
-					if (folderMatch) {
+					if (folderMatch && !isFolderFalling) {
 						const entry = modelEntries.get(clickedPath)
 						if (entry && entry.mixer && entry.animations && entry.animations.length > 0) {
-							const action = entry.mixer.clipAction(entry.animations[0])
-							action.reset()
-							action.time = 0
-							action.setLoop(THREE.LoopOnce, 1)
-							action.clampWhenFinished = true
-							action.play()
+							// Resume playing from the current position (should be paused at 1.0s)
+							entry.animations.forEach((anim, index) => {
+								const action = entry.mixer.clipAction(anim)
+								action.paused = false
+							})
+							isFolderOpening = true
 						}
 					}
 				}
@@ -528,27 +538,38 @@ export function useThreeDeskScene(options = {}) {
 		let wasPaused = false
 
 		if (entry.mixer && entry.animations && entry.animations.length > 0) {
-			action = entry.mixer.clipAction(entry.animations[0])
-			wasPlaying = action.isRunning()
-			wasPaused = action.paused
-			prevTime = action.time
+			const actions = entry.animations.map(anim => entry.mixer.clipAction(anim))
+			wasPlaying = actions[0].isRunning()
+			wasPaused = actions[0].paused
+			prevTime = actions[0].time
 			prevMixerTime = entry.mixer.time
 
-			// 快进到第 24 帧（1.0秒），使模型处于落地状态，从而计算准确的包围盒和落点
-			action.paused = false
-			action.play()
-			entry.mixer.setTime(1.0)
+			actions.forEach((action, index) => {
+				action.paused = false
+				action.play()
+			})
+
+			// 对于 folder_pause 使用落体动画的最终帧(第24帧，约1.0秒)来计算落点
+			// 对于 Folder_project 也要使用落体后的状态(假设是初始状态或者同样快进到第24帧)来对齐
+			if (modelPath === FOLDER_PAUSE_PATH || modelPath.includes('Folder_project')) {
+				entry.mixer.setTime(1.0)
+			} else {
+				entry.mixer.setTime(0)
+			}
 		}
 
 		fitModel(entry.root, entry.config)
 
-		if (entry.mixer && action) {
+		if (entry.mixer && entry.animations && entry.animations.length > 0) {
+			const actions = entry.animations.map(anim => entry.mixer.clipAction(anim))
 			// 恢复动画原始状态
-			if (!wasPlaying) {
-				action.stop()
-			}
-			action.paused = wasPaused
-			action.time = prevTime
+			actions.forEach(action => {
+				if (!wasPlaying) {
+					action.stop()
+				}
+				action.paused = wasPaused
+				action.time = prevTime
+			})
 			entry.mixer.setTime(prevMixerTime)
 		}
 	}
@@ -722,6 +743,10 @@ export function useThreeDeskScene(options = {}) {
 				const gltf = await loader.loadAsync(config.path)
 				const root = gltf.scene
 
+				if	(config.path === '/models/Folder_project1.glb') {
+					console.log(726, gltf)
+				}
+
 				root.traverse((child) => {
 					if (!child.isMesh) {
 						return
@@ -779,35 +804,35 @@ export function useThreeDeskScene(options = {}) {
 		const delta = clock.getDelta()
 		mixers.forEach((mixer) => mixer.update(delta))
 
-		if (isFolderFalling && activePauseAction) {
-			if (activePauseAction.time >= PAUSE_TIME) {
-				isFolderFalling = false
-				activePauseAction.paused = true
-				activePauseAction.time = PAUSE_TIME
+		if (isFolderFalling) {
+			const targetPath = `/models/Folder_project${activeProjectIndex}.glb`
+			const targetEntry = modelEntries.get(targetPath)
+			if (targetEntry && targetEntry.mixer && targetEntry.animations.length > 0) {
+				const mainAction = targetEntry.mixer.clipAction(targetEntry.animations[0])
+				if (mainAction.time >= PAUSE_TIME) {
+					isFolderFalling = false
+					targetEntry.animations.forEach((anim, index) => {
+						const action = targetEntry.mixer.clipAction(anim)
+						action.paused = true
+						// 同样要考虑到 index === 1 提前了 2 帧的偏移量
+						action.time = index === 1 ? PAUSE_TIME + (2 / ANIMATION_FPS) : PAUSE_TIME
+					})
+				}
 			}
 		}
 
-		if (isFolderOpening && activePauseAction) {
-			const duration = activePauseAction.getClip().duration
-			if (activePauseAction.time >= duration - 0.001) {
-				isFolderOpening = false
-				activePauseAction.paused = true
-
-				const pauseEntry = modelEntries.get(FOLDER_PAUSE_PATH)
-				if (pauseEntry) pauseEntry.root.visible = false
-
-				const targetPath = `/models/Folder_project${activeProjectIndex}.glb`
-				const targetEntry = modelEntries.get(targetPath)
-				if (targetEntry) {
-					targetEntry.root.visible = true
-					if (targetEntry.mixer && targetEntry.animations.length > 0) {
-						const action = targetEntry.mixer.clipAction(targetEntry.animations[0])
-						action.reset()
-						action.time = action.getClip().duration
-						action.setLoop(THREE.LoopOnce, 1)
-						action.clampWhenFinished = true
-						action.play()
-					}
+		if (isFolderOpening) {
+			const targetPath = `/models/Folder_project${activeProjectIndex}.glb`
+			const targetEntry = modelEntries.get(targetPath)
+			if (targetEntry && targetEntry.mixer && targetEntry.animations.length > 0) {
+				const mainAction = targetEntry.mixer.clipAction(targetEntry.animations[0])
+				const duration = mainAction.getClip().duration
+				if (mainAction.time >= duration - 0.001) {
+					isFolderOpening = false
+					targetEntry.animations.forEach(anim => {
+						const action = targetEntry.mixer.clipAction(anim)
+						action.paused = true
+					})
 				}
 			}
 		}
