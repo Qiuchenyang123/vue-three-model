@@ -51,105 +51,105 @@ const CAMERA_TARGET = new THREE.Vector3(0, 2.7, 0)
 
 const modelPlacements = [
 	{
-		path: '/models/board_background.glb',
+		path: BOARD_MODEL_PATH,
 		targetSize: new THREE.Vector3(3.88, 4.82, 5.6),
 		position: new THREE.Vector3(-2.65, 2.43, 0.75),
 		rotation: new THREE.Euler(0, 0, 0),
 		anchor: 'center',
 	},
 	{
-		path: '/models/board_project1.glb',
+		path: BOARD_PROJECT1_PATH,
 		targetSize: new THREE.Vector3(1.05, 1.6, 1),
 		position: new THREE.Vector3(-2.69, 3.45, 3.19),
 		rotation: new THREE.Euler(0, 0, 0),
 		anchor: 'center',
 	},
 	{
-		path: '/models/board_project2.glb',
+		path: BOARD_PROJECT2_PATH,
 		targetSize: new THREE.Vector3(1.05, 1.6, 2.8),
 		position: new THREE.Vector3(-2.63, 0.93, 2.13),
 		rotation: new THREE.Euler(0, 0, 0),
 		anchor: 'center',
 	},
 	{
-		path: '/models/board_project3.glb',
+		path: BOARD_PROJECT3_PATH,
 		targetSize: new THREE.Vector3(1.05, 1.6, 1.46),
 		position: new THREE.Vector3(-2.67, 1.18, -0.14),
 		rotation: new THREE.Euler(0, 0, 0),
 		anchor: 'center',
 	},
 	{
-		path: '/models/board_project4.glb',
+		path: BOARD_PROJECT4_PATH,
 		targetSize: new THREE.Vector3(1.05, 1.6, 1.09),
 		position: new THREE.Vector3(-2.67, 1.63, -1.56),
 		rotation: new THREE.Euler(0, 0, 0),
 		anchor: 'center',
 	},
 	{
-		path: '/models/board_project5.glb',
+		path: BOARD_PROJECT5_PATH,
 		targetSize: new THREE.Vector3(1.05, 1.6, 1.44),
 		position: new THREE.Vector3(-2.66, 2.95, -1.89),
 		rotation: new THREE.Euler(0, 0, 0),
 		anchor: 'center',
 	},
 	{
-		path: '/models/board_project6.glb',
+		path: BOARD_PROJECT6_PATH,
 		targetSize: new THREE.Vector3(1.05, 1.6, 1.99),
 		position: new THREE.Vector3(-2.68, 3.6, 0.15),
 		rotation: new THREE.Euler(0, 0, 0.03),
 		anchor: 'center',
 	},
 	{
-		path: '/models/board_project7.glb',
+		path: BOARD_PROJECT7_PATH,
 		targetSize: new THREE.Vector3(1.05, 1.6, 1.08),
 		position: new THREE.Vector3(-2.66, 2.49, -0.18),
 		rotation: new THREE.Euler(0, 0, 0.01),
 		anchor: 'center',
 	},
 	{
-		path: '/models/board_project8.glb',
+		path: BOARD_PROJECT8_PATH,
 		targetSize: new THREE.Vector3(1.05, 1.6, 1.36),
 		position: new THREE.Vector3(-2.62, 2.29, 1.71),
 		rotation: new THREE.Euler(0, 0, -0.01),
 		anchor: 'center',
 	},
 	{
-		path: '/models/antique_desk.glb',
+		path: './models/antique_desk.glb',
 		targetSize: new THREE.Vector3(8.4, 3.4, 5.2),
 		position: new THREE.Vector3(0, -1.65, 0.65),
 		rotation: new THREE.Euler(0, Math.PI / 2, 0),
 		anchor: 'bottom',
 	},
 	{
-		path: '/models/lamp.glb',
+		path: LAMP_MODEL_PATH,
 		targetSize: new THREE.Vector3(1.2, 2.7, 2.3),
 		position: new THREE.Vector3(-0.2, 1.01, -1.11),
 		rotation: new THREE.Euler(0, 0.98, 0),
 		anchor: 'bottom',
 	},
 	{
-		path: '/models/CLIP.glb',
+		path: CLIP_MODEL_PATH,
 		targetSize: new THREE.Vector3(2.27, 0.6, 1.26),
 		position: new THREE.Vector3(0.44, 1, 2.52),
 		rotation: new THREE.Euler(0, 2.76, 0),
 		anchor: 'bottom',
 	},
 	{
-		path: '/models/folder_pause.glb',
+		path: FOLDER_PAUSE_PATH,
 		targetSize: new THREE.Vector3(3, 3, 3),
 		position: new THREE.Vector3(0.3, 0.51, 0),
 		rotation: new THREE.Euler(0, 1.62, 0),
 		anchor: 'bottom',
 	},
 	{
-		path: '/models/coffee.glb',
+		path: COFFEE_MODEL_PATH,
 		targetSize: new THREE.Vector3(0.4, 0.4, 0.4),
 		position: new THREE.Vector3(0.61, 1, -1.22),
 		rotation: new THREE.Euler(0, -Math.PI / 2, 0),
 		anchor: 'bottom',
 	},
 	{
-		path: '/models/phone.glb',
+		path: PHONE_MODEL_PATH,
 		targetSize: new THREE.Vector3(1.21, 1.21, 1.21),
 		position: new THREE.Vector3(-0.42, 1, 2.24),
 		rotation: new THREE.Euler(0, 1.78, 0),
@@ -165,12 +165,12 @@ const modelPlacements = [
 ]
 
 const folderCameraConfig = {
-	position: {x: 0.47, y: 4.7, z: 0},
-	target: {x: 0, y: -2.08, z: 0}
+	position: {x: 0.6, y: 2.85, z: 0.42},
+	target: {x: 0, y: -2, z: 0.42}
 }
 
 export function useThreeDeskScene(options = {}) {
-	const { enableGui = import.meta.env.DEV, onCameraChange } = options
+	const { enableGui = import.meta.env.DEV, onCameraChange, onStateChange } = options
 
 	let renderer
 	let scene
@@ -194,6 +194,8 @@ export function useThreeDeskScene(options = {}) {
 
 	let isFolderFalling = false
 	let isFolderOpening = false
+	let isFolderClosing = false
+	let isFolderRising = false
 	let activeProjectIndex = null
 	let debugCamera = true
 	const ANIMATION_FPS = 24
@@ -201,6 +203,13 @@ export function useThreeDeskScene(options = {}) {
 	const PAUSE_TIME = PAUSE_FRAME / ANIMATION_FPS
 	const SWITCH_FRAME = 58
 	const SWITCH_TIME = SWITCH_FRAME / ANIMATION_FPS
+
+	let interactionState = 'desk' // 'desk', 'moving_to_folder', 'folder_closed', 'opening_folder', 'folder_open', 'closing_folder', 'moving_to_desk'
+
+	function setInteractionState(newState) {
+		interactionState = newState
+		if (onStateChange) onStateChange(newState)
+	}
 
 	let isLampOn = true
 	let lampGlowLight = null
@@ -257,7 +266,7 @@ export function useThreeDeskScene(options = {}) {
 
 	function onPointerDown(event) {
 		const hitTargets = [...hoverableObjects]
-		if (folderHitBox && activeProjectIndex && !isFolderFalling && !isFolderOpening) {
+		if (folderHitBox && activeProjectIndex && interactionState === 'folder_closed') {
 			hitTargets.push(folderHitBox)
 		}
 
@@ -271,11 +280,14 @@ export function useThreeDeskScene(options = {}) {
 			let object = intersects[0].object
 
 			if (object.name === 'FOLDER_HITBOX') {
+				if (interactionState !== 'folder_closed') return
+				setInteractionState('opening_folder')
 				const targetPath = `./models/Folder_project${activeProjectIndex}.glb`
 				const entry = modelEntries.get(targetPath)
 				if (entry && entry.mixer && entry.animations && entry.animations.length > 0) {
 					entry.animations.forEach((anim) => {
 						const action = entry.mixer.clipAction(anim)
+						action.timeScale = 1
 						action.paused = false
 					})
 					isFolderOpening = true
@@ -308,9 +320,12 @@ export function useThreeDeskScene(options = {}) {
 						return
 					}
 
+					if (interactionState !== 'desk') return
+
 					const match = clickedPath.match(/board_project(\d+)\.glb/)
 					if (match) {
 						activeProjectIndex = match[1]
+						setInteractionState('moving_to_folder')
 
 						// Hide all folder projects
 						FOLDER_PATHS.forEach((path) => {
@@ -336,15 +351,8 @@ export function useThreeDeskScene(options = {}) {
 									action.reset()
 									action.setLoop(THREE.LoopOnce, 1)
 									action.clampWhenFinished = true
-
-									// 整体跳过前4帧，基础起始时间为 4/24 秒
-									// 如果是 animations[1]，再额外提前 2 帧，即 6/24 秒
-									/* if (index === 1) {
-										action.time = 6 / ANIMATION_FPS
-									} else {
-									} */
-										action.time = 16 / ANIMATION_FPS
-
+									action.timeScale = 1
+									action.time = 16 / ANIMATION_FPS
 									action.play()
 									action.paused = false
 								})
@@ -792,7 +800,7 @@ export function useThreeDeskScene(options = {}) {
 					hoverableObjects.push(root)
 				}
 
-				if (FOLDER_PATHS.includes(config.path) || config.path === './models/folder_pause.glb') {
+				if (FOLDER_PATHS.includes(config.path) || config.path === FOLDER_PAUSE_PATH) {
 					root.visible = false
 				}
 			}),
@@ -808,6 +816,12 @@ export function useThreeDeskScene(options = {}) {
 
 			if (camera.position.distanceTo(targetCameraPos) < 0.1 && controls.target.distanceTo(targetControlsPos) < 0.1) {
 				isAnimatingCamera = false
+				if (interactionState === 'moving_to_folder' && !isFolderFalling) {
+					setInteractionState('folder_closed')
+				} else if (interactionState === 'moving_to_desk' && !isFolderRising) {
+					setInteractionState('desk')
+					activeProjectIndex = null
+				}
 			}
 		} else if (!debugCamera) {
 			if (activeProjectIndex) {
@@ -850,6 +864,9 @@ export function useThreeDeskScene(options = {}) {
 						// 同样要考虑到 index === 1 提前了 2 帧的偏移量
 						action.time = index === 1 ? PAUSE_TIME + (2 / ANIMATION_FPS) : PAUSE_TIME
 					})
+					if (interactionState === 'moving_to_folder' && !isAnimatingCamera) {
+						setInteractionState('folder_closed')
+					}
 				}
 			}
 		}
@@ -866,6 +883,46 @@ export function useThreeDeskScene(options = {}) {
 						const action = targetEntry.mixer.clipAction(anim)
 						action.paused = true
 					})
+					setInteractionState('folder_open')
+				}
+			}
+		}
+
+		if (isFolderClosing) {
+			const targetPath = `./models/Folder_project${activeProjectIndex}.glb`
+			const targetEntry = modelEntries.get(targetPath)
+			if (targetEntry && targetEntry.mixer && targetEntry.animations.length > 0) {
+				const mainAction = targetEntry.mixer.clipAction(targetEntry.animations[0])
+				if (mainAction.time <= PAUSE_TIME + 0.02) {
+					isFolderClosing = false
+					targetEntry.animations.forEach((anim, index) => {
+						const action = targetEntry.mixer.clipAction(anim)
+						action.paused = true
+						action.timeScale = 1
+						action.time = index === 1 ? PAUSE_TIME + (2 / ANIMATION_FPS) : PAUSE_TIME
+					})
+					setInteractionState('folder_closed')
+				}
+			}
+		}
+
+		if (isFolderRising) {
+			const targetPath = `./models/Folder_project${activeProjectIndex}.glb`
+			const targetEntry = modelEntries.get(targetPath)
+			if (targetEntry && targetEntry.mixer && targetEntry.animations.length > 0) {
+				const mainAction = targetEntry.mixer.clipAction(targetEntry.animations[0])
+				if (mainAction.time <= 0.02) {
+					isFolderRising = false
+					targetEntry.root.visible = false
+					targetEntry.animations.forEach((anim) => {
+						const action = targetEntry.mixer.clipAction(anim)
+						action.stop()
+						action.timeScale = 1
+					})
+					if (interactionState === 'moving_to_desk' && !isAnimatingCamera) {
+						setInteractionState('desk')
+						activeProjectIndex = null
+					}
 				}
 			}
 		}
@@ -978,8 +1035,56 @@ export function useThreeDeskScene(options = {}) {
 	async function mount(container) {
 		createScene(container)
 		await loadModels()
+
+		// 强制预编译所有材质，防止首次显示模型时因编译着色器导致严重卡顿
+		modelEntries.forEach(entry => {
+			if (entry.root) entry.root.visible = true
+		})
+		renderer.compile(scene, camera)
+		modelEntries.forEach((entry, path) => {
+			if (FOLDER_PATHS.includes(path) || path === FOLDER_PAUSE_PATH) {
+				if (entry.root) entry.root.visible = false
+			}
+		})
+
 		createTransformGui()
 		animate()
+	}
+
+	function returnToDesk() {
+		if (interactionState !== 'folder_closed') return
+		setInteractionState('moving_to_desk')
+
+		const targetPath = `./models/Folder_project${activeProjectIndex}.glb`
+		const targetEntry = modelEntries.get(targetPath)
+		if (targetEntry && targetEntry.mixer && targetEntry.animations.length > 0) {
+			targetEntry.animations.forEach((anim) => {
+				const action = targetEntry.mixer.clipAction(anim)
+				action.timeScale = -1
+				action.paused = false
+			})
+			isFolderRising = true
+		}
+
+		targetCameraPos.copy(CAMERA_BASE_POSITION)
+		targetControlsPos.copy(CAMERA_TARGET)
+		isAnimatingCamera = true
+	}
+
+	function closeFolder() {
+		if (interactionState !== 'folder_open') return
+		setInteractionState('closing_folder')
+
+		const targetPath = `./models/Folder_project${activeProjectIndex}.glb`
+		const targetEntry = modelEntries.get(targetPath)
+		if (targetEntry && targetEntry.mixer && targetEntry.animations.length > 0) {
+			targetEntry.animations.forEach((anim) => {
+				const action = targetEntry.mixer.clipAction(anim)
+				action.timeScale = -1
+				action.paused = false
+			})
+			isFolderClosing = true
+		}
 	}
 
 	function dispose() {
@@ -1004,5 +1109,7 @@ export function useThreeDeskScene(options = {}) {
 	return {
 		mount,
 		dispose,
+		returnToDesk,
+		closeFolder
 	}
 }

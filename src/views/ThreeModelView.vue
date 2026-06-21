@@ -5,6 +5,7 @@ import { useThreeDeskScene } from '../composables/useThreeDeskScene'
 const canvasHost = ref(null)
 const isLoading = ref(true)
 const loadError = ref('')
+const uiState = ref('desk')
 const cameraInfo = ref({
 	position: { x: 0, y: 0, z: 0 },
 	rotation: { x: 0, y: 0, z: 0 },
@@ -16,7 +17,15 @@ const deskScene = useThreeDeskScene({
 	onCameraChange: (nextCameraInfo) => {
 		cameraInfo.value = nextCameraInfo
 	},
+	onStateChange: (state) => {
+		uiState.value = state
+	}
 })
+
+function handleViewProject() {
+	console.log('Navigate to project details...')
+	// TODO: router.push('/project')
+}
 
 onMounted(async () => {
 	if (!canvasHost.value) {
@@ -55,6 +64,21 @@ onBeforeUnmount(() => {
 
 		<div v-if="isLoading" class="status-card">正在加载模型...</div>
 		<div v-else-if="loadError" class="status-card error">{{ loadError }}</div>
+
+		<div class="action-buttons" v-if="uiState === 'folder_closed' || uiState === 'folder_open'">
+			<button v-if="uiState === 'folder_closed'" class="icon-btn" @click="deskScene.returnToDesk()" title="返回桌面">
+				<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+			</button>
+			
+			<template v-if="uiState === 'folder_open'">
+				<button class="icon-btn" @click="deskScene.closeFolder()" title="关闭文件夹">
+					<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+				</button>
+				<button class="icon-btn eye-btn" @click="handleViewProject" title="查看项目详情">
+					<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+				</button>
+			</template>
+		</div>
 	</section>
 </template>
 
@@ -175,6 +199,54 @@ onBeforeUnmount(() => {
 
 .error {
 	color: #ffb3aa;
+}
+
+.action-buttons {
+	position: absolute;
+	bottom: 48px;
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	gap: 24px;
+	z-index: 20;
+}
+
+.icon-btn {
+	width: 54px;
+	height: 54px;
+	border-radius: 50%;
+	background: rgba(10, 10, 10, 0.65);
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	color: rgba(255, 255, 255, 0.85);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	backdrop-filter: blur(12px);
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.icon-btn:hover {
+	background: rgba(30, 30, 30, 0.8);
+	color: #fff;
+	transform: scale(1.1) translateY(-2px);
+	border-color: rgba(255, 255, 255, 0.3);
+}
+
+.icon-btn:active {
+	transform: scale(0.95);
+}
+
+.eye-btn {
+	background: rgba(74, 144, 226, 0.45);
+	border-color: rgba(74, 144, 226, 0.3);
+}
+
+.eye-btn:hover {
+	background: rgba(74, 144, 226, 0.7);
+	border-color: rgba(74, 144, 226, 0.6);
+	box-shadow: 0 8px 24px rgba(74, 144, 226, 0.3);
 }
 
 @media (max-width: 768px) {
