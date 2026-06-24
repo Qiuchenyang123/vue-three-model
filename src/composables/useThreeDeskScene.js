@@ -164,9 +164,14 @@ const modelPlacements = [
 	})),
 ]
 
-const folderCameraConfig = {
-	position: {x: 0.6, y: 2.85, z: 0.42},
-	target: {x: 0, y: -2, z: 0.42}
+const folderClosedCameraConfig = {
+	position: {x: 0.71, y: 3.38, z: 0.2},
+	target: {x: -0.17, y: -1.89, z: 0.21}
+}
+
+const folderOpenCameraConfig = {
+	position: {x: 0.57, y: 2.63, z: 0.5},
+	target: {x: -0.09, y: -1.9, z: 0.5}
 }
 
 export function useThreeDeskScene(options = {}) {
@@ -197,7 +202,7 @@ export function useThreeDeskScene(options = {}) {
 	let isFolderClosing = false
 	let isFolderRising = false
 	let activeProjectIndex = null
-	let debugCamera = true
+	let debugCamera = false
 	const ANIMATION_FPS = 24
 	const PAUSE_FRAME = 24
 	const PAUSE_TIME = PAUSE_FRAME / ANIMATION_FPS
@@ -282,6 +287,11 @@ export function useThreeDeskScene(options = {}) {
 			if (object.name === 'FOLDER_HITBOX') {
 				if (interactionState !== 'folder_closed') return
 				setInteractionState('opening_folder')
+
+				targetCameraPos.set(folderOpenCameraConfig.position.x, folderOpenCameraConfig.position.y, folderOpenCameraConfig.position.z)
+				targetControlsPos.set(folderOpenCameraConfig.target.x, folderOpenCameraConfig.target.y, folderOpenCameraConfig.target.z)
+				isAnimatingCamera = true
+
 				const targetPath = `./models/Folder_project${activeProjectIndex}.glb`
 				const entry = modelEntries.get(targetPath)
 				if (entry && entry.mixer && entry.animations && entry.animations.length > 0) {
@@ -361,8 +371,8 @@ export function useThreeDeskScene(options = {}) {
 							}
 
 							// Set camera animation targets
-							targetControlsPos.copy(new THREE.Vector3(folderCameraConfig.target.x, folderCameraConfig.target.y, folderCameraConfig.target.z))
-							targetCameraPos.copy(new THREE.Vector3(folderCameraConfig.position.x, folderCameraConfig.position.y, folderCameraConfig.position.z))
+							targetControlsPos.set(folderClosedCameraConfig.target.x, folderClosedCameraConfig.target.y, folderClosedCameraConfig.target.z)
+							targetCameraPos.set(folderClosedCameraConfig.position.x, folderClosedCameraConfig.position.y, folderClosedCameraConfig.position.z)
 							isAnimatingCamera = true
 						}
 					}
@@ -818,15 +828,15 @@ export function useThreeDeskScene(options = {}) {
 				isAnimatingCamera = false
 				if (interactionState === 'moving_to_folder' && !isFolderFalling) {
 					setInteractionState('folder_closed')
-				} else if (interactionState === 'moving_to_desk' && !isFolderRising) {
+				} else if (interactionState === 'moving_to_desk') {
 					setInteractionState('desk')
 					activeProjectIndex = null
 				}
 			}
 		} else if (!debugCamera) {
 			if (activeProjectIndex) {
-				camera.position.lerp(new THREE.Vector3(folderCameraConfig.position.x, folderCameraConfig.position.y, folderCameraConfig.position.z), 0.1)
-				controls.target.lerp(new THREE.Vector3(folderCameraConfig.target.x, folderCameraConfig.target.y, folderCameraConfig.target.z), 0.1)
+				camera.position.lerp(targetCameraPos, 0.1)
+				controls.target.lerp(targetControlsPos, 0.1)
 			} else {
 				const basePos = CAMERA_BASE_POSITION.clone()
 				const baseTarget = CAMERA_TARGET.clone()
@@ -838,7 +848,8 @@ export function useThreeDeskScene(options = {}) {
 				const right = new THREE.Vector3(1, 0, 0).applyQuaternion(dummyCam.quaternion)
 				const up = new THREE.Vector3(0, 1, 0).applyQuaternion(dummyCam.quaternion)
 
-				right.multiplyScalar(mouse.x * 0.8)
+				// 反转 x 轴的乘数，使鼠标向左时视角向左移动
+				right.multiplyScalar(-mouse.x * 0.8)
 				up.multiplyScalar(mouse.y * 0.4)
 
 				targetControlsPos.copy(baseTarget).add(right).add(up)
@@ -902,27 +913,6 @@ export function useThreeDeskScene(options = {}) {
 						action.time = index === 1 ? PAUSE_TIME + (2 / ANIMATION_FPS) : PAUSE_TIME
 					})
 					setInteractionState('folder_closed')
-				}
-			}
-		}
-
-		if (isFolderRising) {
-			const targetPath = `./models/Folder_project${activeProjectIndex}.glb`
-			const targetEntry = modelEntries.get(targetPath)
-			if (targetEntry && targetEntry.mixer && targetEntry.animations.length > 0) {
-				const mainAction = targetEntry.mixer.clipAction(targetEntry.animations[0])
-				if (mainAction.time <= 0.02) {
-					isFolderRising = false
-					targetEntry.root.visible = false
-					targetEntry.animations.forEach((anim) => {
-						const action = targetEntry.mixer.clipAction(anim)
-						action.stop()
-						action.timeScale = 1
-					})
-					if (interactionState === 'moving_to_desk' && !isAnimatingCamera) {
-						setInteractionState('desk')
-						activeProjectIndex = null
-					}
 				}
 			}
 		}
@@ -1036,11 +1026,23 @@ export function useThreeDeskScene(options = {}) {
 		createScene(container)
 		await loadModels()
 
-		// 强制预编译所有材质，防止首次显示模型时因编译着色器导致严重卡顿
+		// 强制预热：不仅要预编译着色器，还要预分配骨骼纹理和阴影贴图
 		modelEntries.forEach(entry => {
 			if (entry.root) entry.root.visible = true
 		})
+		
+		// 1. 预编译着色器代码
 		renderer.compile(scene, camera)
+		
+		// 2. 强制执行一次真实的渲染管线 (非常关键)
+		// 这会将所有 SkinnedMesh 的骨骼矩阵数据(DataTexture)以及 ShadowMap 阴影深度图全部推送到 GPU
+		if (composer) {
+			composer.render()
+		} else {
+			renderer.render(scene, camera)
+		}
+
+		// 预热完毕后，再将不需要显示的模型隐藏
 		modelEntries.forEach((entry, path) => {
 			if (FOLDER_PATHS.includes(path) || path === FOLDER_PAUSE_PATH) {
 				if (entry.root) entry.root.visible = false
@@ -1057,13 +1059,12 @@ export function useThreeDeskScene(options = {}) {
 
 		const targetPath = `./models/Folder_project${activeProjectIndex}.glb`
 		const targetEntry = modelEntries.get(targetPath)
-		if (targetEntry && targetEntry.mixer && targetEntry.animations.length > 0) {
-			targetEntry.animations.forEach((anim) => {
-				const action = targetEntry.mixer.clipAction(anim)
-				action.timeScale = -1
-				action.paused = false
-			})
-			isFolderRising = true
+		if (targetEntry && targetEntry.root) {
+			// 直接隐藏模型，不需要倒放掉落动画
+			targetEntry.root.visible = false
+			if (targetEntry.mixer) {
+				targetEntry.mixer.stopAllAction()
+			}
 		}
 
 		targetCameraPos.copy(CAMERA_BASE_POSITION)
@@ -1074,6 +1075,10 @@ export function useThreeDeskScene(options = {}) {
 	function closeFolder() {
 		if (interactionState !== 'folder_open') return
 		setInteractionState('closing_folder')
+
+		targetCameraPos.set(folderClosedCameraConfig.position.x, folderClosedCameraConfig.position.y, folderClosedCameraConfig.position.z)
+		targetControlsPos.set(folderClosedCameraConfig.target.x, folderClosedCameraConfig.target.y, folderClosedCameraConfig.target.z)
+		isAnimatingCamera = true
 
 		const targetPath = `./models/Folder_project${activeProjectIndex}.glb`
 		const targetEntry = modelEntries.get(targetPath)
